@@ -166,7 +166,7 @@ plt.title('Feature Correlations with target')
 
 <img src="./assets/corrs.png">
 
-上图中排在前三的EXT_SOURCE特征是专业人士依据外部数据对该客户进行的评分，值域为[0, 1]，它们的相关性都超过了0.15；DAY_BIRTH表示的是客户的年龄；两个REGION_RATING特征是对客户所在地的评分，分为三档，用{1, 2, 3}表示。接下来我们将对这些特征进行可视化分析。
+上图中（相关性已取绝对值）排在前三的EXT_SOURCE特征是专业人士依据外部数据对该客户进行的评分，值域为[0, 1]，它们的相关性都超过了0.15；DAY_BIRTH表示的是客户的年龄；两个REGION_RATING特征是对客户所在地的评分，分为三档，用{1, 2, 3}表示。接下来我们将对这些特征进行可视化分析。
 
 
 
@@ -294,25 +294,80 @@ plt.title('Correlation Heatmap');
 
 
 
-### 五、研究方法与模型思路
+### 五、特征工程
+
+本项目中的特征工程，主要分为新特征衍生和特征降维两部分。在新特征衍生部分，我们将尝试使用多项式特征构造法、专业知识特征构造法以及特征自动生成工具来衍生出新特征，并保留其中效果较好的参与建模。在特征降维中，我们会去除一些贡献度较小的特征：如缺失值过多的特征、与Target相关度过小的特征、共线特征等，以提高模型的效率。
+
+#### 5.1 新特征衍生
+
+##### 5.1.1 多项式特征
+
+多项式特征是一种非常简单的特征构造方法，其衍生的新特征为原有特征的n次多项式，形如f1 * f2 ^ 2，f3 ^ 3。
+
+实操中，我们参考了[GitHub上的一篇文章]( https://jakevdp.github.io/PythonDataScienceHandbook/05.04-feature-engineering.html )。
+
+Dcikit-Learn直接为我们提供了一个PolynomialFeatures的类来构造多项式特征，创建该类的实例时需要传入一个参数degree即为多项式的最高幂次。为了避免模型出现过拟合，degree不应取得过高。项目中我们将degree设为3，使用上文分析过的年龄、EXT_SOURCE作为原始特征，尝试构造多项式特征。具体操作如下。
+
+```python
+from sklearn.preprocessing import PolynomialFeatures
+
+# Select features
+poly_features = app_train[['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3', 'DAYS_BIRTH', 'TARGET']]
+
+# Create the polynomial object with specified degree
+poly_transformer = PolynomialFeatures(degree = 3)
+
+# Train the polynomial features
+poly_transformer.fit(poly_features)
+
+# Transform the features
+poly_features = poly_transformer.transform(poly_features)
+poly_features_test = poly_transformer.transform(poly_features_test)
+```
+
+计算新特征与Target的相关性并进行可视化，结果如下。（相关性大小已取绝对值）
+
+<img src="./assets/poly_corrs.png">
+
+可以看出，许多特征的相关性超过了原有特征。排在前几的特征均为EXT_SOURCE特征的乘积，新特征EXT_SOUCE_2 * EXT_SOURCE_3 的相关性达到了0.19，相比原特征EXT_SOUCE_2的0.16略有提升。但也需注意，EXT_SOURCE_2 在于 DAYS_BIRTH相乘后，新特征相关性反而略有下降。
+
+在建模前，我们会选择一部分新特征加入到数据集中，并尝试不同的特征组合，根据效果决定最终选择。
+
+
+
+##### 5.1.2 专业知识特征
+
+
+
+##### 5.1.3 特征生成工具 Feature Tool
+
+
+
+#### 5.2 特征降维
+
+##### 5.2.1 共线特征去除
+
+##### 5.2.2 缺失值过多特征去除
+
+##### 5.3.3 重要性较低特征去除
+
+
+
+
+
+### 六、研究方法与模型思路
 
 > 这一章偏重于理论介绍
 
-#### 5.1 特征工程
-
-#### 5.2 模型介绍
 
 
 
-### 六、实验与分析
+
+### 七、实验与分析
 
 > 这一章偏重于的对(五)的实现，以及对比不同实现方法的效果好坏
 
-#### 6.1 特征工程
 
-主要参照 [FeatureSelection](https://www.kaggle.com/willkoehrsen/introduction-to-feature-selection) 上对不同特征工程的效果测试
-
-#### 6.2 
 
 
 

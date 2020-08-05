@@ -302,11 +302,9 @@ plt.title('Correlation Heatmap');
 
 ##### 5.1.1 多项式特征
 
-多项式特征是一种非常简单的特征构造方法，其衍生的新特征为原有特征的n次多项式，形如f1 * f2 ^ 2，f3 ^ 3。
+多项式特征是一种非常简单的特征构造方法，其衍生的新特征为原有特征的n次多项式，形如f1 * f2 ^ 2，f3 ^ 3。实操中，我们参考了[GitHub上的一篇文章]( https://jakevdp.github.io/PythonDataScienceHandbook/05.04-feature-engineering.html )。
 
-实操中，我们参考了[GitHub上的一篇文章]( https://jakevdp.github.io/PythonDataScienceHandbook/05.04-feature-engineering.html )。
-
-Dcikit-Learn直接为我们提供了一个PolynomialFeatures的类来构造多项式特征，创建该类的实例时需要传入一个参数degree即为多项式的最高幂次。为了避免模型出现过拟合，degree不应取得过高。项目中我们将degree设为3，使用上文分析过的年龄、EXT_SOURCE作为原始特征，尝试构造多项式特征。具体操作如下。
+Dcikit-Learn直接为我们提供了一个PolynomialFeatures的类来构造多项式特征，创建该类的实例时需要传入一个参数degree，即为多项式的最高幂次。为了避免模型出现过拟合，degree不应取得过高。项目中我们将degree设为3，使用上文分析过的年龄、EXT_SOURCE作为原始特征，尝试构造多项式特征。具体操作如下。
 
 ```python
 from sklearn.preprocessing import PolynomialFeatures
@@ -329,13 +327,41 @@ poly_features_test = poly_transformer.transform(poly_features_test)
 
 <img src="./assets/poly_corrs.png">
 
-可以看出，许多特征的相关性超过了原有特征。排在前几的特征均为EXT_SOURCE特征的乘积，新特征EXT_SOUCE_2 * EXT_SOURCE_3 的相关性达到了0.19，相比原特征EXT_SOUCE_2的0.16略有提升。但也需注意，EXT_SOURCE_2 在于 DAYS_BIRTH相乘后，新特征相关性反而略有下降。
+可以看出，许多特征的相关性超过了原有特征。排在前几的特征均为EXT_SOURCE特征的乘积。效果最好的新特征为EXT_SOUCE_2 * EXT_SOURCE_3，其相关性达到了0.19，相比原特征EXT_SOUCE_2的0.16略有提升。但也需注意，EXT_SOURCE_2 在于 DAYS_BIRTH相乘后产生的新特征，相关性反而较EXT_SOURCE_2略有下降。
 
 在建模前，我们会选择一部分新特征加入到数据集中，并尝试不同的特征组合，根据效果决定最终选择。
 
 
 
 ##### 5.1.2 专业知识特征
+
+专业知识特征是利用金融知识和经验，人为地构造一些我们主观上认为可能会影响客户违约情况的新特征。
+
+由于我们的金融知识有限，所以这一部分我们参考了[Kaggle上的一篇文章](https://www.kaggle.com/willkoehrsen/start-here-a-gentle-introduction)，构造出以下四个特征。
+
+*  CREDIT_INCOME_PERCENT ：信用额度(credit)占客户收入(income)的百分比
+*  ANNUITY_INCOME_PERCENT  ：贷款年金(annuity)占客户收入(income)的百分比
+*  ANNUITY_CREDIT_PERCENT ：贷款年金(annuity)占信用额度(credit)的百分比
+*  DAYS_EMPLOYED_PERCENT ：客户工作天数(days_employed)占年龄(days_birth)的百分比
+
+```python
+app_train_domain = app_train.copy()
+
+app_train_domain['CREDIT_INCOME_PERCENT'] = app_train_domain['AMT_CREDIT'] / app_train_domain['AMT_INCOME_TOTAL']
+app_train_domain['ANNUITY_INCOME_PERCENT'] = app_train_domain['AMT_ANNUITY'] / app_train_domain['AMT_INCOME_TOTAL']
+app_train_domain['ANNUITY_CREDIT_PERCENT'] = app_train_domain['AMT_ANNUITY'] / app_train_domain['AMT_CREDIT']
+app_train_domain['DAYS_EMPLOYED_PERCENT'] = app_train_domain['DAYS_EMPLOYED'] / app_train_domain['DAYS_BIRTH']
+```
+
+对上面四个特征进行可视化分析，得到分布图和相关性柱状图如下：
+
+<img src="./assets/domain_distribution.png">
+
+<img src="./assets/domain_corrs.png">
+
+从分布图来看，前两个特征(CREDIT_INCOME, ANNUITY_INCOME)的违约未违约曲线拟合度非常高，所以效果应该不是很好。后两个特征(ANNUITY_CREDIT, DAYS_EMPLOYED)的曲线有较明显的差异，但是不同客户的曲线趋势仍是一致的。从相关性来看，各个新特征的相关性都较高，或基于原特征有部分提升。至于这些特征对我们的模型具体有多大的贡献，还需要在建模时进行实验。
+
+
 
 
 

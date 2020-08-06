@@ -247,7 +247,7 @@ for i, source in enumerate(['REGION_RATING_CLIENT', 'REGION_RATING_CLIENT_W_CITY
     plt.figure(figsize = (5, 3))
     tot = app_train[app_train['TARGET']!=-1].groupby(source).count()['TARGET']
     default = app_train[app_train['TARGET']==1].groupby(source).count()['TARGET']
-    plt.bar(tot.index, default / tot, width=0.35, color='lightskyblue')
+    plt.bar(tot.index, default / tot, width=0.35)
     
     # Label the plots
     plt.title('Distribution of %s ' % source)
@@ -363,9 +363,59 @@ app_train_domain['DAYS_EMPLOYED_PERCENT'] = app_train_domain['DAYS_EMPLOYED'] / 
 
 
 
+##### 5.1.3 特征生成工具 Feature Tools
 
+featuretools是一个生成新特征的库，它基于深度特征综合(Deep Feature Synthesis)的方法，从一组相关表中自动创建新特征。使用时需要先初始化一个EntitySet，之后把我们所拥有的数据表(Entity)加入到其中，指定原函数(primitive)后，直接调用DFS方法即可自动生成新特征。
 
-##### 5.1.3 特征生成工具 Feature Tool
+原函数(primitive)可以分为Aggregation和Transform两种。其中Aggregation主要针对允许ID重复的子数据集，提供如min、sum这样的函数对同一ID在某一特征上的不同数值进行计算，从而产生新特征，比如把某一客户过去多次借贷记录中的最大金额作为新特征。Transform则针对单个数据集中的一个或多个特征列，提供absolute、diff这样的函数，比如把某两个特征的差值作为新特征。
+
+在我们的项目中，只有一个数据集，所以只使用Transform函数。通过下面的代码可以查看具体的Transform函数。
+
+```python
+primitives = ft.list_primitives()
+pd.options.display.max_colwidth = 100
+primitives[primitives['type'] == 'transform'].head(10)
+```
+
+输出：
+
+|      | name       | type      | description                                                  |
+| :--- | :--------- | :-------- | ------------------------------------------------------------ |
+| 19   | absolute   | transform | Absolute value of base feature.                              |
+| 20   | year       | transform | Transform a Datetime feature into the year.                  |
+| 21   | compare    | transform | For each value, determine if it is equal to another value.   |
+| 22   | month      | transform | Transform a Datetime feature into the month.                 |
+| 23   | week       | transform | Transform a Datetime feature into the week.                  |
+| 24   | days_since | transform | For each value of the base feature, compute the number of days between it |
+| 25   | hours      | transform | Transform a Timedelta feature into the number of hours.      |
+| 26   | minute     | transform | Transform a Datetime feature into the minute.                |
+| 27   | seconds    | transform | Transform a Timedelta feature into the number of seconds.    |
+| 28   | cum_min    | transform | Calculates the min of previous values of an instance for each value in a time-dependent entity. |
+
+我们的数据集中所有的特征都已经处理为数值特征，所以暂选取了以下几个函数进行特征生成：
+
+```python
+default_trans_primitives =  ["diff", "divide_by_feature", "absolute", "haversine"]
+```
+
+将DFS的max_depth设置为2(即基于原特征最多作用两个函数)，这样我们最后得到了1681个特征，部分特征如下：
+
+```
+[<Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Block))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Mixed))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Monolithic))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Others))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Panel))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Stone, brick))>,
+ <Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Wooden))>,
+ <Feature: ABSOLUTE(DIFF(WEEKDAY_APPR_PROCESS_START_FRIDAY))>,
+ <Feature: ABSOLUTE(DIFF(WEEKDAY_APPR_PROCESS_START_MONDAY))>,
+ <Feature: ABSOLUTE(DIFF(WEEKDAY_APPR_PROCESS_START_SATURDAY))>]
+```
+
+可以看出，featuretools只是简单粗暴地按照我们的设定，对函数和原特征进行排列组合产生新特征。这样产生的特征数量多，且没法像前两种方法一样保证新特征的效果。此外，由于我们的数据量比较大，使用featuretools会耗费过多的时间，比如在我们参考文章的案例中，仅仅是使用featuretools构造新特征的时间就超过了1个小时。
+
+所以最终我们决定，在本次项目中对featuretools的探索就到此为止，实际建模中不采用这种方法衍生新特征。
 
 
 
@@ -383,23 +433,19 @@ app_train_domain['DAYS_EMPLOYED_PERCENT'] = app_train_domain['DAYS_EMPLOYED'] / 
 
 ### 六、研究方法与模型思路
 
-> 这一章偏重于理论介绍
-
 
 
 
 
 ### 七、实验与分析
 
-> 这一章偏重于的对(五)的实现，以及对比不同实现方法的效果好坏
 
 
 
 
+### 八、结论与展望
 
-### 七、结论与展望
 
-- [ ] TODO
 
 
 

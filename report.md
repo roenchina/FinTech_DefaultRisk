@@ -329,7 +329,7 @@ poly_features_test = poly_transformer.transform(poly_features_test)
 
 可以看出，许多特征的相关性超过了原有特征。排在前几的特征均为EXT_SOURCE特征的乘积。效果最好的新特征为EXT_SOUCE_2 * EXT_SOURCE_3，其相关性达到了0.19，相比原特征EXT_SOUCE_2的0.16略有提升。但也需注意，EXT_SOURCE_2 在于 DAYS_BIRTH相乘后产生的新特征，相关性反而较EXT_SOURCE_2略有下降。
 
-在建模前，我们会选择一部分新特征加入到数据集中，并尝试不同的特征组合，根据效果决定最终选择。
+最终，我们选定了在相关性中排名前十的特征，把它们加入到数据集中参与建模。
 
 
 
@@ -374,23 +374,18 @@ featuretools是一个生成新特征的库，它基于深度特征综合(Deep Fe
 ```python
 primitives = ft.list_primitives()
 pd.options.display.max_colwidth = 100
-primitives[primitives['type'] == 'transform'].head(10)
+primitives[primitives['type'] == 'transform'].head()
 ```
 
 输出：
 
-|      | name       | type      | description                                                  |
-| :--- | :--------- | :-------- | ------------------------------------------------------------ |
-| 19   | absolute   | transform | Absolute value of base feature.                              |
-| 20   | year       | transform | Transform a Datetime feature into the year.                  |
-| 21   | compare    | transform | For each value, determine if it is equal to another value.   |
-| 22   | month      | transform | Transform a Datetime feature into the month.                 |
-| 23   | week       | transform | Transform a Datetime feature into the week.                  |
-| 24   | days_since | transform | For each value of the base feature, compute the number of days between it |
-| 25   | hours      | transform | Transform a Timedelta feature into the number of hours.      |
-| 26   | minute     | transform | Transform a Datetime feature into the minute.                |
-| 27   | seconds    | transform | Transform a Timedelta feature into the number of seconds.    |
-| 28   | cum_min    | transform | Calculates the min of previous values of an instance for each value in a time-dependent entity. |
+|      | name     | type      | description                                                |
+| :--- | :------- | :-------- | ---------------------------------------------------------- |
+| 19   | absolute | transform | Absolute value of base feature.                            |
+| 20   | year     | transform | Transform a Datetime feature into the year.                |
+| 21   | compare  | transform | For each value, determine if it is equal to another value. |
+| 22   | month    | transform | Transform a Datetime feature into the month.               |
+| 23   | week     | transform | Transform a Datetime feature into the week.                |
 
 我们的数据集中所有的特征都已经处理为数值特征，所以暂选取了以下几个函数进行特征生成：
 
@@ -398,7 +393,7 @@ primitives[primitives['type'] == 'transform'].head(10)
 default_trans_primitives =  ["diff", "divide_by_feature", "absolute", "haversine"]
 ```
 
-将DFS的max_depth设置为2(即基于原特征最多作用两个函数)，这样我们最后得到了1681个特征，部分特征如下：
+将DFS的max_depth设置为2(即最多使用两个函数)，这样我们最后得到了1681个特征，部分特征如下：
 
 ```
 [<Feature: ABSOLUTE(DIFF(WALLSMATERIAL_MODE_Block))>,
@@ -413,13 +408,15 @@ default_trans_primitives =  ["diff", "divide_by_feature", "absolute", "haversine
  <Feature: ABSOLUTE(DIFF(WEEKDAY_APPR_PROCESS_START_SATURDAY))>]
 ```
 
-可以看出，featuretools只是简单粗暴地按照我们的设定，对函数和原特征进行排列组合产生新特征。这样产生的特征数量多，且没法像前两种方法一样保证新特征的效果。此外，由于我们的数据量比较大，使用featuretools会耗费过多的时间，比如在我们参考文章的案例中，仅仅是使用featuretools构造新特征的时间就超过了1个小时。
+可以看出，featuretools只是简单粗暴地按照我们的设定，对函数和原特征进行排列组合产生新特征。这样产生的特征数量过多，且没法像前两种方法一样保证新特征的效果。此外，由于我们的数据量比较大，使用featuretools会耗费过多的时间，比如在我们参考文章的案例中，仅仅是构造新特征的时间就超过了1个小时。
 
-所以最终我们决定，在本次项目中对featuretools的探索就到此为止，实际建模中不采用这种方法衍生新特征。
+所以最终我们决定，本次项目中对featuretools的探索就到此为止，实际建模时不采用这种方法衍生新特征。
 
 
 
 #### 5.2 特征降维
+
+本次项目原始数据集的特征有121个，在对标称属性进行编码、衍生新特征之后，特征数达到两百多个。为了减少不必要的运算，我们进行特征降维，去除一些贡献较小的特征。
 
 ##### 5.2.1 共线特征去除
 

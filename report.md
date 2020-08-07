@@ -93,6 +93,8 @@ EXT_SOURCE_1/EXT_SOURCE_2/EXT_SOURCE_3 - 通过其他信息计算的该客户评
 
 #### 4.2 可视化分析
 
+> note: 这一部分在vis.ipynb中实现。
+
 以下可视化分析针对未经预处理的训练集aplication_train.csv
 
 ##### 4.2.1 Target列的分布
@@ -284,17 +286,13 @@ plt.title('Correlation Heatmap');
 
 #### 4.3 数据预处理
 
-- [ ] TODO
-
-  编码
-
-  缺失
-
-  异常
+数据预处理包括标称属性编码、缺失值填充、数据规范化等。但由于不同模型对数据的要求不同，我们并没有统一做数据预处理，而是每个模型各处理一次，具体参照后文。
 
 
 
 ### 五、特征工程
+
+> note: 这一部分在feature_engineering.ipynb中实现。
 
 本项目中的特征工程，主要分为新特征衍生和特征降维两部分。在新特征衍生部分，我们将尝试使用多项式特征构造法、专业知识特征构造法以及特征自动生成工具来衍生出新特征，并保留其中效果较好的参与建模。在特征降维中，我们会去除一些贡献度较小的特征：如缺失值过多的特征、与Target相关度过小的特征、共线特征等，以提高模型的效率。
 
@@ -416,15 +414,97 @@ default_trans_primitives =  ["diff", "divide_by_feature", "absolute", "haversine
 
 #### 5.2 特征降维
 
-本次项目原始数据集的特征有121个，在对标称属性进行编码、衍生新特征之后，特征数达到两百多个。为了减少不必要的运算，我们进行特征降维，去除一些贡献较小的特征。
+本次项目原始数据集的特征有121个，在对标称属性进行编码、新特征衍生之后，特征数达到了两百多个。为了减少不必要的运算，我们进行特征降维，去除一些贡献过小的特征。
 
-##### 5.2.1 共线特征去除
+##### 5.2.1 共线特征
 
-##### 5.2.2 缺失值过多特征去除
+数据集中，有许多特征之间的相关性非常高，这造成了数据的冗余。对于一组相关性较高的特征，只需要保留其中一个特征即可。
 
-##### 5.3.3 重要性较低特征去除
+我们首先获得所有数值特征之间的相关性矩阵，并对它取绝对值、转换成上三角的形式。
+
+```python
+# Absolute value correlation matrix
+corr_matrix = app_train_nf.corr().abs()
+
+# Upper triangle of correlations
+upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+```
+
+之后，我们设定一个阈值threshold，相关性大于该阈值则被认为是共线特征，需要被去除，将它们加入到to_drop列表中。
+
+```python
+# Select columns with correlations above threshold
+to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
+```
+
+阈值设定为0.975时，to_drop中有25个特征需要删除；阈值设定为0.99时，有18个特征需要删除，如：'FLAG_EMP_PHONE' - 是否提供工作电话、'APARTMENTS_MEDI' - 公寓为中等大小等。
+
+为了避免损失重要的数据，我们在这里较为保守地将阈值设定为0.99，并删除了这18个特征。
+
+```python
+app_train_nf = app_train_nf.drop(columns = to_drop)
+app_test_nf = app_test_nf.drop(columns = to_drop)
+```
 
 
+
+##### 5.2.2 缺失值过多特征
+
+特征的缺失值需要我们对其行填充，我们实际上是在向数据集中加入本不存在的数据。如果一个特征的缺失值太多，那么大部分数据都是我们所“编造”的，这样的特征会使数据偏离真实，从而使模型的效果变差。所以我们需要删除缺失值过多的特征。删除的阈值需要谨慎选取，我们在这里选取了参考文章中的“0.75”作为阈值。
+
+首先看看训练集、测试集中的缺失情况。
+
+```python
+# Train missing values (in percent)
+train_missing = (app_train_nf.isnull().sum() / len(app_train_nf)).sort_values(ascending = False)
+train_missing.head(10)
+```
+
+输出：
+
+```
+COMMONAREA_MODE             0.698723
+COMMONAREA_AVG              0.698723
+NONLIVINGAPARTMENTS_MODE    0.694330
+NONLIVINGAPARTMENTS_AVG     0.694330
+FONDKAPREMONT_MODE          0.683862
+LIVINGAPARTMENTS_AVG        0.683550
+LIVINGAPARTMENTS_MODE       0.683550
+FLOORSMIN_AVG               0.678486
+FLOORSMIN_MODE              0.678486
+YEARS_BUILD_AVG             0.664978
+dtype: float64
+```
+
+可以看出所有特征的缺失都没有超过0.7。并且只有20个特征的缺失率超过0.5。所以看来，本数据集的数据缺失情况还是可以忍受的，我们在这一步不需要删除任何特征。
+
+
+
+##### 5.3.3 重要性较低特征
+
+这一步需要训练基于树的模型，并得到模型中特征的重要性(importance)，并删除重要性为0的特征。
+
+我们使用了LGBM模型进行训练，并重复两次，对特征重要性取了平均值。得到的结果中，有49个特征的重要性为0.
+
+```
+There are 49 features with 0.0 importance
+		feature	importance
+70		70		0.0
+208		208		0.0
+151		151		0.0
+184		184		0.0
+181		181		0.0
+```
+
+对特征重要性归一化之后，进行可视化的结果如下：
+
+<img src='./assets/importance.png'>
+
+<img src='./assets/cumulative.png'>
+
+第二张图表示的特征重要性的积累曲线，它说明了在我们的237个特征之中，只需要前145个就可以达到0.99的特征重要性。这也为我们进行特征降维提供了一个思路，如果想要更快的训练速度，我们可以牺牲一点准确性，只保留前145个特征。不过，在我们的项目中，并不采用这种方法进行特征降维。
+
+最后，由于我们的项目是以探究学习为目的，没有必要过分追求效率，所以我们决定保留这49个重要性为0的特征。
 
 
 

@@ -1,4 +1,6 @@
 
 application_test.csv
 application_train.csv
+processed_test.csv
+processed_train.csv
 report.md
